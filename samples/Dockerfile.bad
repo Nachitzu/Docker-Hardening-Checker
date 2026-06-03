@@ -1,0 +1,25 @@
+# Intentionally bad Dockerfile — used by the "Load sample" button.
+# Each line is a different smell the analyzer should flag.
+
+FROM ubuntu
+
+ENV DB_PASSWORD=hunter2
+ENV AWS_SECRET_ACCESS_KEY=AKIAEXAMPLEKEY
+
+ARG API_TOKEN=abc123def456
+
+ADD http://example.com/install.sh /tmp/install.sh
+RUN curl -sSL https://get.example.com | sh
+
+RUN apt-get update && apt-get install -y python3 curl
+
+WORKDIR app
+COPY . .
+
+EXPOSE 22 3389
+
+RUN useradd -m app
+USER app
+RUN echo "weird: RUN after USER" > /tmp/x
+
+CMD ["python3", "app.py"]

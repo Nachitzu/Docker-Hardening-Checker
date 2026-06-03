@@ -1,0 +1,43 @@
+# Intentionally weak docker-compose — used by the "Load sample" button.
+# Each line is a different smell the analyzer should flag.
+
+version: "3.8"
+
+services:
+  api:
+    image: myapi
+    privileged: true
+    network_mode: host
+    pid: host
+    cap_add:
+      - SYS_ADMIN
+      - NET_ADMIN
+    environment:
+      - DB_PASSWORD=hunter2
+      - AWS_ACCESS_KEY_ID=AKIAEXAMPLE
+    env_file:
+      - .env
+    ports:
+      - "0.0.0.0:3306:3306"
+      - "22:22"
+      - "8080:80"
+    volumes:
+      - /:/host
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: always
+
+  worker:
+    image: myworker:latest
+    environment:
+      - REDIS_URL=redis://localhost
+    ports:
+      - "6379:6379"
+
+  web:
+    image: nginx:1.27.3
+    user: "1000:1000"
+    read_only: true
+    cap_drop:
+      - ALL
+    ports:
+      - "127.0.0.1:8080:80"

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Docker Hardening Checker</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="logo" aria-hidden="true">&#x1F433;</div>
+      <div>
+        <h1>Docker Hardening Checker</h1>
+        <p class="tagline">Paste a <code>Dockerfile</code> or <code>docker-compose.yml</code> and get a security report.</p>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel input-panel">
+      <div class="controls">
+        <div class="kind-toggle" role="tablist" aria-label="File type">
+          <button type="button" class="kind-btn active" data-kind="dockerfile" role="tab" aria-selected="true">Dockerfile</button>
+          <button type="button" class="kind-btn" data-kind="compose" role="tab" aria-selected="false">docker-compose.yml</button>
+          <span class="hint" id="autoHint">auto-detected from file name</span>
+        </div>
+
+        <div class="actions">
+          <label class="file-pick">
+            <input type="file" id="fileInput" accept=".dockerfile,Dockerfile,.yml,.yaml,*" />
+            <span>Open file&hellip;</span>
+          </label>
+          <button type="button" id="sampleBtn" class="ghost">Load sample</button>
+          <button type="button" id="clearBtn" class="ghost">Clear</button>
+        </div>
+      </div>
+
+      <textarea id="source" spellcheck="false"
+                placeholder="Paste your Dockerfile here, or drop a file on the editor..."></textarea>
+
+      <div class="run-bar">
+        <span class="filename" id="filenameLabel">unsaved</span>
+        <button type="button" id="analyzeBtn" class="primary">Analyze</button>
+      </div>
+    </section>
+
+    <section class="panel results-panel" id="resultsPanel" hidden>
+      <div class="results-header">
+        <h2>Findings</h2>
+        <div class="summary" id="summary"></div>
+      </div>
+      <div class="filter-row">
+        <label><input type="checkbox" class="sev-filter" value="critical" checked> critical</label>
+        <label><input type="checkbox" class="sev-filter" value="high" checked> high</label>
+        <label><input type="checkbox" class="sev-filter" value="medium" checked> medium</label>
+        <label><input type="checkbox" class="sev-filter" value="low" checked> low</label>
+        <label><input type="checkbox" class="sev-filter" value="info" checked> info</label>
+        <span class="empty-msg" id="emptyMsg" hidden>No findings &mdash; looking good.</span>
+      </div>
+      <ol class="findings" id="findings"></ol>
+    </section>
+  </main>
+
+  <footer>
+    <span>Offline, single-file Flask app. Rules: see <code>app.py</code>.</span>
+  </footer>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Local artifacts
+hardening.sarif
+hardening.json
+_test_summary.md
+_live_test.df
+
+# Editor
+.idea/
+.vscode/
+*.swp
+.DS_Store
+_live_test.df

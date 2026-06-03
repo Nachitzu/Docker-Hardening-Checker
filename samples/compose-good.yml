@@ -1,0 +1,11 @@
+services:
+  web:
+    image: nginx:1.27.3
+    user: "1000:1000"
+    read_only: true
+    cap_drop: [ALL]
+    ports:
+      - "127.0.0.1:8080:80"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 30s

@@ -1,0 +1,50 @@
+name: Docker Hardening
+
+# Example workflow showing how to use this action from a different repo.
+# Replace `./` with `nacho/Docker-Hardening-Checker@v1` once the repo is on GitHub.
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # Uncomment the two lines below to upload SARIF to GitHub code scanning.
+  # security-events: write
+  # actions: read
+
+jobs:
+  harden:
+    name: Check Dockerfiles and compose files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Docker Hardening Checker
+        uses: ./
+        with:
+          # Scan the whole repo. Override with space-separated globs, e.g.
+          #   paths: 'Dockerfile services/**/Dockerfile deploy/docker-compose*.yml'
+          paths: '.'
+          fail-on: high
+          format: github
+          # Suppress noisy rules. Example: skip the "COPY . ." check.
+          # ignore: 'DF-010,DC-011'
+
+      # --- Optional: upload SARIF to GitHub code scanning ---
+      # - name: Upload SARIF
+      #   if: always()
+      #   uses: github/codeql-action/upload-sarif@v3
+      #   with:
+      #     sarif_file: hardening.sarif
+
+      # --- Optional: run again as JSON and stash the report as an artifact ---
+      # - name: Generate JSON report
+      #   if: always()
+      #   run: python cli.py . --format json --output hardening.json
+      # - uses: actions/upload-artifact@v4
+      #   with:
+      #     name: hardening-report
+      #     path: hardening.json

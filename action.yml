@@ -1,0 +1,145 @@
+name: 'Docker Hardening Checker'
+description: >-
+  Analyze Dockerfiles and docker-compose files for security bad practices
+  (root user, exposed ports, secrets in ENV, unpinned images, privileged
+  containers, etc.). Emits GitHub Actions annotations and a step summary,
+  and can fail the build on configurable severity.
+author: 'Mavis'
+
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  paths:
+    description: >-
+      Paths to scan. Files, directories, or glob patterns. Multiple values are
+      space-separated. Default: the workspace root.
+    required: false
+    default: '.'
+  fail-on:
+    description: >-
+      Minimum severity that causes the action to fail. One of
+      critical|high|medium|low|info. Default: high.
+    required: false
+    default: 'high'
+  format:
+    description: >-
+      Output format. text = human-readable, json = machine-readable,
+      sarif = GitHub code scanning upload, github = Actions annotations +
+      $GITHUB_STEP_SUMMARY. Inside an Actions runner the default is github.
+    required: false
+    default: 'auto'
+  output:
+    description: >-
+      Optional file path to write the report to. The step summary is always
+      populated when format=github regardless of this setting.
+    required: false
+    default: ''
+  ignore:
+    description: >-
+      Comma-separated list of rule ids to suppress (e.g. "DF-010,DC-011").
+    required: false
+    default: ''
+  python-version:
+    description: 'Python version to use. Default: 3.11.'
+    required: false
+    default: '3.11'
+
+outputs:
+  total:
+    description: 'Total number of findings.'
+    value: ${{ steps.run.outputs.total }}
+  critical:
+    description: 'Number of critical findings.'
+    value: ${{ steps.run.outputs.critical }}
+  high:
+    description: 'Number of high findings.'
+    value: ${{ steps.run.outputs.high }}
+  medium:
+    description: 'Number of medium findings.'
+    value: ${{ steps.run.outputs.medium }}
+  low:
+    description: 'Number of low findings.'
+    value: ${{ steps.run.outputs.low }}
+  info:
+    description: 'Number of info findings.'
+    value: ${{ steps.run.outputs.info }}
+  exit-code:
+    description: 'Exit code of the checker (0 = pass, 1 = findings above threshold, 2 = tool error).'
+    value: ${{ steps.run.outputs.exit_code }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+        cache: 'pip'
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install -r "$GITHUB_ACTION_PATH/requirements.txt"
+
+    - name: Run Docker Hardening Checker
+      id: run
+      shell: bash
+      env:
+        GITHUB_ACTIONS: 'true'
+      run: |
+        set +e
+        ARGS=()
+        for p in ${{ inputs.paths }}; do
+          ARGS+=("$p")
+        done
+        ARGS+=(--fail-on "${{ inputs.fail-on }}")
+        if [ -n "${{ inputs.format }}" ] && [ "${{ inputs.format }}" != "auto" ]; then
+          ARGS+=(--format "${{ inputs.format }}")
+        fi
+        if [ -n "${{ inputs.output }}" ]; then
+          ARGS+=(--output "${{ inputs.output }}")
+        fi
+        if [ -n "${{ inputs.ignore }}" ]; then
+          IFS=',' read -ra IGN <<< "${{ inputs.ignore }}"
+          for r in "${IGN[@]}"; do
+            ARGS+=(--ignore "$(echo "$r" | xargs)")
+          done
+        fi
+        cd "$GITHUB_WORKSPACE"
+        python "$GITHUB_ACTION_PATH/cli.py" "${ARGS[@]}"
+        EXIT=$?
+        echo "exit_code=$EXIT" >> "$GITHUB_OUTPUT"
+        # If the user asked for JSON, parse totals for the outputs.
+        if [ -n "${{ inputs.output }}" ] && [[ "${{ inputs.output }}" == *.json ]] \
+           && [ -f "${{ inputs.output }}" ]; then
+          python - <<PY >> "$GITHUB_OUTPUT"
+          import json
+          try:
+              d = json.load(open(r"""${{ inputs.output }}"""))
+              for k in ("critical","high","medium","low","info","total"):
+                  print(f"{k}={d.get('totals', {}).get(k, 0)}")
+          except Exception as e:
+              print(f"::warning::Could not parse JSON output: {e}")
+          PY
+        else
+          # Without JSON, scrape totals from the step summary written by --format github.
+          SUMMARY="$RUNNER_TEMP/GITHUB_STEP_SUMMARY"
+          if [ -f "$SUMMARY" ]; then
+            python - <<'PY' >> "$GITHUB_OUTPUT"
+            import os, re
+            p = os.path.join(os.environ.get("RUNNER_TEMP",""), "GITHUB_STEP_SUMMARY")
+            text = open(p, encoding="utf-8").read() if os.path.exists(p) else ""
+            counts = {"critical":0, "high":0, "medium":0, "low":0, "info":0, "total":0}
+            for sev in counts:
+                m = re.search(r"`" + sev + r"`\s*:\s*(\d+)", text)
+                if m: counts[sev] = int(m.group(1))
+            counts["total"] = sum(counts.values()) - counts["total"]
+            for k, v in counts.items():
+                print(f"{k}={v}")
+            PY
+          fi
+        fi
+        exit $EXIT

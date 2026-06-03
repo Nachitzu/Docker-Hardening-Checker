@@ -1,0 +1,561 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Docker Hardening Checker",
+          "version": "1.0.0",
+          "informationUri": "https://github.com/example/docker-hardening-checker",
+          "rules": [
+            {
+              "id": "DF-004-ENV",
+              "name": "DF-004-ENV",
+              "shortDescription": {
+                "text": "Possible secret in ENV: DB_PASSWORD"
+              },
+              "fullDescription": {
+                "text": "`ENV DB_PASSWORD=...` looks like a hard-coded secret. ENV values are visible in `docker inspect` and image layers; ARG values are visible in build history."
+              },
+              "help": {
+                "text": "Inject secrets at runtime (`docker run -e`, Docker secrets, or a vault) or use BuildKit's `--secret` mount for build-time values."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "DF-004-ARG",
+              "name": "DF-004-ARG",
+              "shortDescription": {
+                "text": "Possible secret in ARG: API_TOKEN"
+              },
+              "fullDescription": {
+                "text": "`ARG API_TOKEN=...` looks like a hard-coded secret. ENV values are visible in `docker inspect` and image layers; ARG values are visible in build history."
+              },
+              "help": {
+                "text": "Inject secrets at runtime (`docker run -e`, Docker secrets, or a vault) or use BuildKit's `--secret` mount for build-time values."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "DF-003",
+              "name": "DF-003",
+              "shortDescription": {
+                "text": "RUN after USER directive"
+              },
+              "fullDescription": {
+                "text": "There is a RUN instruction after USER. Anything installed there will be owned by the unprivileged user, which often causes 'permission denied' errors and pushes teams to set USER back to root. Reorder: install as root, then USER."
+              },
+              "help": {
+                "text": "Move the final USER directive to the end of the Dockerfile, after all RUN/COPY/ADD."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "DF-001",
+              "name": "DF-001",
+              "shortDescription": {
+                "text": "Unpinned base image: ubuntu"
+              },
+              "fullDescription": {
+                "text": "Image 'ubuntu' is no tag (resolves to :latest). Unpinned images break reproducibility and can pull breaking or malicious updates on rebuild."
+              },
+              "help": {
+                "text": "Pin to a specific version (`nginx:1.27.3`) or, better, a digest (`nginx:1.27.3@sha256:...`)."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "DF-001b",
+              "name": "DF-001b",
+              "shortDescription": {
+                "text": "Base image without tag"
+              },
+              "fullDescription": {
+                "text": "When no tag is specified, Docker defaults to :latest, which makes builds non-reproducible."
+              },
+              "help": {
+                "text": "Add an explicit tag, e.g. `FROM python:3.12-slim`."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "DF-006",
+              "name": "DF-006",
+              "shortDescription": {
+                "text": "Piping a remote download into a shell"
+              },
+              "fullDescription": {
+                "text": "`curl ... | sh` is dangerous: the remote script can change at any time, MITM can swap the payload, and the build is not reproducible. There's also no signature check."
+              },
+              "help": {
+                "text": "Download to a file, verify its checksum or signature, then run."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "DF-009",
+              "name": "DF-009",
+              "shortDescription": {
+                "text": "Sensitive port EXPOSEd: 22"
+              },
+              "fullDescription": {
+                "text": "Port 22 is a well-known management port (SSH, RDP, Postgres, etc.). Exposing it inside an image is a strong smell — the application should not expose management interfaces at all."
+              },
+              "help": {
+                "text": "Remove this EXPOSE. If the service must be reachable, restrict it to a private network in docker-compose and never publish to 0.0.0.0."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              }
+            },
+            {
+              "id": "DF-010",
+              "name": "DF-010",
+              "shortDescription": {
+                "text": "COPY . . copies the whole build context"
+              },
+              "fullDescription": {
+                "text": "`COPY . .` ships the build context into the image, including .git, .env, node_modules, and any other file present on the host. Secrets checked in by accident will be baked in."
+              },
+              "help": {
+                "text": "Use a .dockerignore file to exclude sensitive/unnecessary paths, and copy only what you need."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              }
+            },
+            {
+              "id": "DF-008",
+              "name": "DF-008",
+              "shortDescription": {
+                "text": "No HEALTHCHECK defined"
+              },
+              "fullDescription": {
+                "text": "Without HEALTHCHECK the orchestrator cannot tell a healthy process from a hung one."
+              },
+              "help": {
+                "text": "Add a HEALTHCHECK instruction, e.g. `HEALTHCHECK CMD curl -f http://localhost/ || exit 1`."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "DF-007",
+              "name": "DF-007",
+              "shortDescription": {
+                "text": "apt-get install without --no-install-recommends"
+              },
+              "fullDescription": {
+                "text": "Recommended packages bloat the image and pull in extra services that increase the attack surface."
+              },
+              "help": {
+                "text": "Use `apt-get install --no-install-recommends` and clean the apt cache in the same RUN (`rm -rf /var/lib/apt/lists/*`)."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "DF-007b",
+              "name": "DF-007b",
+              "shortDescription": {
+                "text": "apt cache not cleaned in the same RUN"
+              },
+              "fullDescription": {
+                "text": "Leaving /var/lib/apt/lists in the image leaks package metadata and bloats layers."
+              },
+              "help": {
+                "text": "Append `&& rm -rf /var/lib/apt/lists/*` to the same RUN."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            },
+            {
+              "id": "DF-011",
+              "name": "DF-011",
+              "shortDescription": {
+                "text": "WORKDIR is not absolute"
+              },
+              "fullDescription": {
+                "text": "Relative WORKDIR paths depend on whatever the base image set as cwd, which is fragile and confusing."
+              },
+              "help": {
+                "text": "Use an absolute path, e.g. `WORKDIR /app`."
+              },
+              "defaultConfiguration": {
+                "level": "note"
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "DF-004-ENV",
+          "level": "error",
+          "message": {
+            "text": "Possible secret in ENV: DB_PASSWORD — `ENV DB_PASSWORD=...` looks like a hard-coded secret. ENV values are visible in `docker inspect` and image layers; ARG values are visible in build history."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "file:///C:/Users/nacho/Documents/GitHub/Docker-Hardening-Checker/samples/Dockerfile.bad",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 6
+                }
+              }
+            }
+          ],
+          "properties": {
+            "severity": "critical",
+            "remediation": "Inject secrets at runtime (`docker run -e`, Docker secrets, or a vault) or use BuildKit's `--secret` mount for build-time values.",
+            "snippet": "ENV DB_PASSWORD=hunter2"
+          }
+        },
+        {
+          "ruleId": "DF-004-ENV",
+          "level": "error",
+          "message": {
+            "text": "Possible secret in ENV: AWS_SECRET_ACCESS_KEY — `ENV AWS_SECRET_ACCESS_KEY=...` looks like a hard-coded secret. ENV values are visible in `docker inspect` and image layers; ARG values are visible in build history."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "file:///C:/Users/nacho/Documents/GitHub/Docker-Hardening-Checker/samples/Dockerfile.bad",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 7
+                }
+              }
+            }
+          ],
+          "properties": {
+            "severity": "critical",
+            "remediation": "Inject secrets at runtime (`docker run -e`, Docker secrets, or a vault) or use BuildKit's `--secret` mount for build-time values.",
+            "snippet": "ENV AWS_SECRET_ACCESS_KEY=AKIAEXAMPLEKEY"
+          }
+        },
+        {
+          "ruleId": "DF-004-ARG",
+          "level": "error",
+          "message": {
+            "text": "Possible secret in ARG: API_TOKEN — `ARG API_TOKEN=...` looks like a hard-coded secret. ENV values are visible in `docker inspect` and image layers; ARG values are visible in build history."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "file:///C:/Users/nacho/Documents/GitHub/Docker-Hardening-Checker/samples/Dockerfile.bad",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 9
+                }
+              }
+            }
+          ],
+          "properties": {
+            "severity": "critical",
+            "remediation": "Inject secrets at runtime (`docker run -e`, Docker secrets, or a vault) or use BuildKit's `--secret` mount for build-time values.",
+            "snippet": "ARG API_TOKEN=abc123def456"
+          }
+        },
+        {
+          "ruleId": "DF-003",
+          "level": "error",
+          "message": {
+            "text": "RUN after USER directive — There is a RUN instruction after USER. Anything installed there will be owned by the unprivileged user, which often causes 'permission denied' errors and pushes teams to set USER back to root. Reorder: install as root, then USER."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "file:///C:/Users/nacho/Documents/GitHub/Docker-Hardening-Checker/samples/Dockerfile.bad",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "properties": {
+            "severity": "high",
+            "remediation": "Move the final USER directive to the end of the Dockerfile, after all RUN/COPY/ADD.",
+            "snippet": null
+          }
+        },
+        {
+          "ruleId": "DF-001",
+          "level": "error",
+          "message": {
+            "text": "Unpinned base image: ubuntu — Image 'ubuntu' is no tag (resolves to :latest). Unpinned images break reproducibility and can pull breaking or malicious updates on rebuild."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "file:///C:/Users/nacho/Documents/GitHub/Docker-Hardening-Checker/samples/Dockerfile.bad",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 4
+                }
+              }
+            }
+          ],
+          "properties": {
+            "severity": "high",
+            "remediation": "Pin to a specific version (`nginx:1.27.3`) or, better, a digest (`nginx:1.27.3@sha256:...`).",
+            "snippet": "FROM ubuntu"
+          }
+        },
+        {
+          "ruleId": "DF-001b",
+          "level": "error",
+          "message": {
+            "text": "Base image without tag — When no tag is specified, Docker defaults to :latest, which makes builds non-reproducible."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "file:///C:/Users/nacho/Documents/GitHub/Docker-Hardening-Checker/samples/Dockerfile.bad",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 4
+                }
+              }
+            }
+          ],
+          "properties": {
+            "severity": "high",
+            "remediation": "Add an explicit tag, e.g. `FROM python:3.12-slim`.",
+            "snippet": "FROM ubuntu"
+          }
+        },
+        {
+          "ruleId": "DF-006",
+          "level": "error",
+          "message": {
+            "text": "Piping a remote download into a shell — `curl ... | sh` is dangerous: the remote script can change at any time, MITM can swap the payload, and the build is not reproducible. There's also no signature check."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "file:///C:/Users/nacho/Documents/GitHub/Docker-Hardening-Checker/samples/Dockerfile.bad",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 12
+                }
+              }
+            }
+          ],
+          "properties": {
+            "severity": "high",
+            "remediation": "Download to a file, verify its checksum or signature, then run.",
+            "snippet": "RUN curl -sSL https://get.example.com | sh"
+          }
+        },
+        {
+          "ruleId": "DF-009",
+          "level": "error",
+          "message": {
+            "text": "Sensitive port EXPOSEd: 22 — Port 22 is a well-known management port (SSH, RDP, Postgres, etc.). Exposing it inside an image is a strong smell — the application should not expose management interfaces at all."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "file:///C:/Users/nacho/Documents/GitHub/Docker-Hardening-Checker/samples/Dockerfile.bad",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 19
+                }
+              }
+            }
+          ],
+          "properties": {
+            "severity": "high",
+            "remediation": "Remove this EXPOSE. If the service must be reachable, restrict it to a private network in docker-compose and never publish to 0.0.0.0.",
+            "snippet": "EXPOSE 22 3389"
+          }
+        },
+        {
+          "ruleId": "DF-009",
+          "level": "error",
+          "message": {
+            "text": "Sensitive port EXPOSEd: 3389 — Port 3389 is a well-known management port (SSH, RDP, Postgres, etc.). Exposing it inside an image is a strong smell — the application should not expose management interfaces at all."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "file:///C:/Users/nacho/Documents/GitHub/Docker-Hardening-Checker/samples/Dockerfile.bad",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 19
+                }
+              }
+            }
+          ],
+          "properties": {
+            "severity": "high",
+            "remediation": "Remove this EXPOSE. If the service must be reachable, restrict it to a private network in docker-compose and never publish to 0.0.0.0.",
+            "snippet": "EXPOSE 22 3389"
+          }
+        },
+        {
+          "ruleId": "DF-010",
+          "level": "warning",
+          "message": {
+            "text": "COPY . . copies the whole build context — `COPY . .` ships the build context into the image, including .git, .env, node_modules, and any other file present on the host. Secrets checked in by accident will be baked in."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "file:///C:/Users/nacho/Documents/GitHub/Docker-Hardening-Checker/samples/Dockerfile.bad",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 17
+                }
+              }
+            }
+          ],
+          "properties": {
+            "severity": "medium",
+            "remediation": "Use a .dockerignore file to exclude sensitive/unnecessary paths, and copy only what you need.",
+            "snippet": "COPY . ."
+          }
+        },
+        {
+          "ruleId": "DF-008",
+          "level": "note",
+          "message": {
+            "text": "No HEALTHCHECK defined — Without HEALTHCHECK the orchestrator cannot tell a healthy process from a hung one."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "file:///C:/Users/nacho/Documents/GitHub/Docker-Hardening-Checker/samples/Dockerfile.bad",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "properties": {
+            "severity": "low",
+            "remediation": "Add a HEALTHCHECK instruction, e.g. `HEALTHCHECK CMD curl -f http://localhost/ || exit 1`.",
+            "snippet": null
+          }
+        },
+        {
+          "ruleId": "DF-007",
+          "level": "note",
+          "message": {
+            "text": "apt-get install without --no-install-recommends — Recommended packages bloat the image and pull in extra services that increase the attack surface."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "file:///C:/Users/nacho/Documents/GitHub/Docker-Hardening-Checker/samples/Dockerfile.bad",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 14
+                }
+              }
+            }
+          ],
+          "properties": {
+            "severity": "low",
+            "remediation": "Use `apt-get install --no-install-recommends` and clean the apt cache in the same RUN (`rm -rf /var/lib/apt/lists/*`).",
+            "snippet": "RUN apt-get update && apt-get install -y python3 curl"
+          }
+        },
+        {
+          "ruleId": "DF-007b",
+          "level": "note",
+          "message": {
+            "text": "apt cache not cleaned in the same RUN — Leaving /var/lib/apt/lists in the image leaks package metadata and bloats layers."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "file:///C:/Users/nacho/Documents/GitHub/Docker-Hardening-Checker/samples/Dockerfile.bad",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 14
+                }
+              }
+            }
+          ],
+          "properties": {
+            "severity": "low",
+            "remediation": "Append `&& rm -rf /var/lib/apt/lists/*` to the same RUN.",
+            "snippet": "RUN apt-get update && apt-get install -y python3 curl"
+          }
+        },
+        {
+          "ruleId": "DF-011",
+          "level": "note",
+          "message": {
+            "text": "WORKDIR is not absolute — Relative WORKDIR paths depend on whatever the base image set as cwd, which is fragile and confusing."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "file:///C:/Users/nacho/Documents/GitHub/Docker-Hardening-Checker/samples/Dockerfile.bad",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 16
+                }
+              }
+            }
+          ],
+          "properties": {
+            "severity": "low",
+            "remediation": "Use an absolute path, e.g. `WORKDIR /app`.",
+            "snippet": "WORKDIR app"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,133 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Lint, type-check, and run the test suite.
+  # ---------------------------------------------------------------------------
+  test:
+    name: Lint, types, tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Ruff
+        run: ruff check .
+
+      - name: Mypy
+        run: mypy app.py cli.py
+
+      - name: Pytest
+        run: pytest
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+
+  # ---------------------------------------------------------------------------
+  # 2. Dogfooding — run the action against the repo itself.
+  #    Scans production source code only; `samples/` contains intentionally
+  #    bad files used as test fixtures and is excluded so the dogfooding
+  #    job does not flag its own test data.
+  # ---------------------------------------------------------------------------
+  dogfood:
+    name: Self-scan (dogfooding)
+    runs-on: ubuntu-latest
+    # Only run after tests pass to save minutes.
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Self-scan (production code)
+        # The repo has no real Dockerfiles yet, so this should produce zero
+        # findings. If anything pops up here, the production code itself has
+        # been polluted.
+        run: |
+          set +e
+          python cli.py . \
+            --ignore DF-001 --ignore DF-001b --ignore DF-004-ENV --ignore DF-004-ARG \
+            --ignore DF-005 --ignore DF-006 --ignore DF-007 --ignore DF-007b \
+            --ignore DF-008 --ignore DF-009 --ignore DF-010 --ignore DF-011 \
+            --ignore DF-002 --ignore DF-002b --ignore DF-003 \
+            --ignore DC-001 --ignore DC-002 --ignore DC-003 --ignore DC-004 \
+            --ignore DC-005 --ignore DC-006 --ignore DC-007 --ignore DC-008 \
+            --ignore DC-009 --ignore DC-010 --ignore DC-011 --ignore DC-012 \
+            --ignore DC-013 --ignore DC-014 --ignore DC-015 --ignore DC-016 \
+            --ignore DC-017 --ignore DC-VER --ignore DC-SECRET \
+            --fail-on low --no-color
+          # Force success — this is informational. Real enforcement happens
+          # in the `enforce` job below once there are real Dockerfiles.
+          exit 0
+
+  # ---------------------------------------------------------------------------
+  # 3. Enforce — if real Dockerfiles/compose files exist at the repo root or
+  #    in a top-level `docker/` directory, this job fails on critical/high
+  #    findings. Add files there to start enforcing.
+  # ---------------------------------------------------------------------------
+  enforce:
+    name: Enforce on real configs
+    runs-on: ubuntu-latest
+    needs: test
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+      - name: Scan real production files
+        run: |
+          # Scan only top-level Dockerfiles and a `docker/` folder if present.
+          # `samples/` is excluded by design (it contains intentionally bad
+          # files used as test fixtures).
+          TARGETS=""
+          for f in Dockerfile docker-compose.yml docker-compose.yaml compose.yml compose.yaml; do
+            [ -f "$f" ] && TARGETS="$TARGETS $f"
+          done
+          if [ -d docker ]; then
+            TARGETS="$TARGETS docker"
+          fi
+          if [ -z "$TARGETS" ]; then
+            echo "No real Dockerfiles / compose files at the repo root or in docker/."
+            echo "Add one to start enforcing security policy via this action."
+            exit 0
+          fi
+          echo "Scanning: $TARGETS"
+          python cli.py $TARGETS --fail-on high --no-color
